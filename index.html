@@ -57,22 +57,24 @@
             position: absolute;
             transform-origin: bottom center;
             transform: translateX(-50%) rotateX(-75deg); 
-            transition: left 0.15s ease-out; 
+            /* Yanal geçişler daha yumuşak (0.25s) yapıldı */
+            transition: left 0.25s ease-in-out; 
             display: flex;
             justify-content: center;
             align-items: flex-end;
         }
 
-        /* Yüklediğin Resimlerin Boyut ve Gölge Ayarları - küçültüldü */
         .entity img {
             max-height: 95px;
         }
         
-        #tom img { max-height: 160px; } 
+        /* Tom'un boyutu 160px'den 110px'e düşürüldü */
+        #tom img { max-height: 110px; } 
         #jerry img { max-height: 100px; }
 
+        /* Tom'un konumu biraz daha arkaya alındı ki Jerry'ye çok yapışmasın */
         #jerry { left: 50%; bottom: 260px; z-index: 100; }
-        #tom { left: 50%; bottom: 90px; z-index: 101; }
+        #tom { left: 50%; bottom: 110px; z-index: 101; }
         .obstacle { font-size: 65px; }
         .cheese { font-size: 60px; }
 
@@ -117,7 +119,6 @@
         }
         button:active { transform: scale(0.95); }
 
-        /* Hediye Kutusu ve Çiçekler */
         #gift-container { position: relative; width: 150px; height: 150px; margin-top: 30px; cursor: pointer; }
         .gift-part { position: absolute; background-color: #ff1493; border: 4px solid #fff; border-radius: 10px; box-shadow: 0 10px 20px rgba(0,0,0,0.3); transition: all 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55); }
         #gift-base { bottom: 0; left: 10px; width: 120px; height: 100px; }
@@ -186,7 +187,6 @@
             <div class="lane-line line-left"></div>
             <div class="lane-line line-right"></div>
             
-            <!-- Görseller Burada Çağrılıyor -->
             <div id="tom" class="entity"><img src="25275.png" alt="Tom"></div>
             <div id="jerry" class="entity"><img src="25276.jpg" alt="Jerry"></div>
         </div>
@@ -197,21 +197,18 @@
         <div class="ctrl-btn" id="btn-right">▶</div>
     </div>
 
-    <!-- Başlangıç -->
     <div id="start-screen" class="screen">
         <h1 style="color: #ff69b4;">Eylül'ün Kaçış Serüveni</h1>
         <p style="font-size: 20px; max-width: 400px;">Tom peşinde! Yoldaki engellere dikkat et. Peynirleri toplayarak can kazanabilirsin!</p>
         <button onclick="startGame()">Maceraya Başla</button>
     </div>
 
-    <!-- Kaybetme -->
     <div id="game-over" class="screen hidden">
         <h2>Eyvah, Yakalandın!</h2>
         <p>Tom seni yakaladı ama bir şansın daha var.</p>
         <button onclick="location.reload()">Tekrar Dene</button>
     </div>
 
-    <!-- Hediye ve Final Ekranı -->
     <div id="win-screen" class="screen hidden" style="background: rgba(255, 182, 193, 0.95);">
         <h2 id="win-title" style="color: #333; font-size: 36px;">Tebrikler, Kaçmayı Başardın!</h2>
         <div id="gift-container" onclick="openGift()">
@@ -236,7 +233,7 @@
         const lanes = [30, 50, 70]; 
         
         let score = 0;
-        const targetScore = 7000;  // yol biraz uzatıldı
+        const targetScore = 7000;
         let lives = 3;
         
         const jerry = document.getElementById('jerry');
@@ -246,10 +243,11 @@
         const livesDisplay = document.getElementById('lives-display');
         
         let items = [];
-        let gameLoop, itemLoop;
+        let animationFrameId; // 60 FPS döngüsü için eklendi
+        let itemLoop;
         let isInvincible = false; 
 
-        // ---------- Ses Sistemi (harici dosya gerektirmez) ----------
+        // ---------- Ses Sistemi ----------
         let soundOn = true;
         let audioCtx = null;
         function getAudioCtx() {
@@ -276,7 +274,7 @@
                 osc.start();
                 gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
                 osc.stop(ctx.currentTime + duration);
-            } catch (e) { /* sessiz geç */ }
+            } catch (e) { }
         }
         function playHitSound() {
             playTone(160, 0.25, 'sawtooth', 0.35);
@@ -298,7 +296,6 @@
             });
         }
 
-        // Basit kovalamaca müziği (bas + vurgu deseni, döngü halinde)
         let musicInterval;
         let musicStep = 0;
         const bassPattern = [130.81, 130.81, 164.81, 130.81, 196.00, 164.81, 130.81, 146.83];
@@ -318,7 +315,7 @@
             clearInterval(musicInterval);
         }
 
-        // ---------- Jerry'nin beyaz arkaplanını şeffaflaştırma (canvas) ----------
+        // ---------- Arkaplan Silici ----------
         function removeWhiteBackground(imgEl, threshold) {
             threshold = threshold || 235;
             function process() {
@@ -346,7 +343,7 @@
         }
         removeWhiteBackground(jerry.querySelector('img'));
 
-        // ---------- Oyun Mantığı ----------
+        // ---------- Oyun Kontrolleri ----------
         function updateLivesText() {
             let hearts = "";
             for(let i=0; i<lives; i++) hearts += "❤️";
@@ -365,7 +362,7 @@
 
         document.addEventListener('touchstart', (e) => {
             if(!gameActive) return;
-            if(e.target.closest('#controls')) return; // kontrol tuşları kendi mantığını çalıştırır
+            if(e.target.closest('#controls')) return;
             const touchX = e.touches[0].clientX;
             if(touchX < window.innerWidth / 2 && currentLane > 0) currentLane--;
             else if(touchX >= window.innerWidth / 2 && currentLane < 2) currentLane++;
@@ -391,18 +388,19 @@
             jerry.style.left = lanes[currentLane] + '%';
             setTimeout(() => {
                 if(gameActive) tom.style.left = lanes[currentLane] + '%';
-            }, 250); 
+            }, 300); // Tom'un tepki süresini biraz uzattık (gerçekçilik katar)
         }
 
-        // Tek engel: fare kapanı
+        // ---------- Nesneler ----------
         const obstacleEmojis = ['🪤'];
-
         let consecutiveObstacles = 0;
+        
         function spawnItem() {
             if(!gameActive) return;
-            if(items.filter(i => i.dataset.type !== 'finish').length >= 6) return; // aşırı yoğunluğu ve kasmayı önle
+            if(items.filter(i => i.dataset.type !== 'finish').length >= 6) return; 
+            
             const item = document.createElement('div');
-            const forceCheese = consecutiveObstacles >= 2; // üst üste 2 tuzaktan sonra mutlaka peynir gelsin
+            const forceCheese = consecutiveObstacles >= 2; 
             const isCheese = forceCheese || Math.random() < 0.30;
             
             if(isCheese) {
@@ -456,15 +454,18 @@
             setTimeout(() => {
                 isInvincible = false;
                 jerry.classList.remove('hit-effect');
-            }, 250); 
+            }, 500); // Yenilmezlik süresini biraz uzattık (oyuncuyu korur)
         }
 
-        // ---------- Kademeli Zorluk ----------
-        let currentSpeed = 35;
+        // ---------- FPS Bazlı Hız Sistemi (60 FPS için uyarlandı) ----------
+        let currentSpeed = 15; 
         let currentSpawnRate = 500;
+        
         function adjustDifficulty() {
-            currentSpeed = 35 + Math.min(25, Math.floor(score / 600) * 3);
-            const newSpawnRate = Math.max(230, 500 - Math.floor(score / 500) * 18);
+            // Hızlanma matematiği 60 FPS'e göre ayarlandı
+            currentSpeed = 14 + Math.min(10, Math.floor(score / 600) * 1.5);
+            const newSpawnRate = Math.max(250, 500 - Math.floor(score / 500) * 20);
+            
             if (newSpawnRate !== currentSpawnRate) {
                 currentSpawnRate = newSpawnRate;
                 clearInterval(itemLoop);
@@ -472,10 +473,12 @@
             }
         }
 
+        // setInterval yerine requestAnimationFrame kullanılarak oyun akıcı hale getirildi
         function update() {
             if(!gameActive) return;
-            score += 3;
-            scoreDisplay.innerText = "Mesafe: " + score;
+            
+            score += 1.25; // 60 FPS olduğu için puan artışını dengeledik
+            scoreDisplay.innerText = "Mesafe: " + Math.floor(score);
             adjustDifficulty();
 
             if(score >= targetScore && !items.find(i => i.dataset.type === "finish")) {
@@ -490,7 +493,8 @@
                 item.dataset.z = currentZ;
                 item.style.bottom = currentZ + 'px';
 
-                if(currentZ < 280 && currentZ > 180) {
+                // Hitbox algılama aralığı uyarlandı
+                if(currentZ < 280 && currentZ > 200) {
                     if(item.dataset.type === "finish") {
                         winGame();
                         return;
@@ -508,26 +512,33 @@
                         }
                     }
                 }
+                
                 if(currentZ < -100) {
                     item.remove();
                     items.splice(i, 1);
                 }
             }
+            
+            // Döngüyü tarayıcı ekran yenileme hızına bağlar (Genelde 60 FPS)
+            animationFrameId = requestAnimationFrame(update);
         }
 
         function startGame() {
-            if (gameActive) return; // çift tıklama/dokunma koruması
+            if (gameActive) return; 
             try {
-                clearInterval(gameLoop);
+                cancelAnimationFrame(animationFrameId);
                 clearInterval(itemLoop);
                 document.getElementById('start-screen').classList.add('hidden');
+                
                 gameActive = true;
-                currentSpeed = 35;
+                currentSpeed = 15;
                 currentSpawnRate = 500;
                 consecutiveObstacles = 0;
+                
                 updatePositions();
                 updateLivesText();
-                gameLoop = setInterval(update, 40);
+                
+                animationFrameId = requestAnimationFrame(update); // Akıcı motor başladı
                 itemLoop = setInterval(spawnItem, currentSpawnRate);
                 startMusic();
             } catch (e) {
@@ -538,7 +549,7 @@
 
         function gameOver() {
             gameActive = false;
-            clearInterval(gameLoop);
+            cancelAnimationFrame(animationFrameId);
             clearInterval(itemLoop);
             stopMusic();
             playLoseSound();
@@ -547,7 +558,7 @@
 
         function winGame() {
             gameActive = false;
-            clearInterval(gameLoop);
+            cancelAnimationFrame(animationFrameId);
             clearInterval(itemLoop);
             stopMusic();
             playWinSound();
