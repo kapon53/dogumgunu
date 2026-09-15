@@ -57,7 +57,6 @@
             position: absolute;
             transform-origin: bottom center;
             transform: translateX(-50%) rotateX(-75deg); 
-            /* Yanal geçişler daha yumuşak (0.25s) yapıldı */
             transition: left 0.25s ease-in-out; 
             display: flex;
             justify-content: center;
@@ -68,11 +67,9 @@
             max-height: 95px;
         }
         
-        /* Tom'un boyutu 160px'den 110px'e düşürüldü */
         #tom img { max-height: 110px; } 
         #jerry img { max-height: 100px; }
 
-        /* Tom'un konumu biraz daha arkaya alındı ki Jerry'ye çok yapışmasın */
         #jerry { left: 50%; bottom: 260px; z-index: 100; }
         #tom { left: 50%; bottom: 110px; z-index: 101; }
         .obstacle { font-size: 65px; }
@@ -233,7 +230,8 @@
         const lanes = [30, 50, 70]; 
         
         let score = 0;
-        const targetScore = 7000;
+        // Oyun süresi kısaltıldı (7000'den 3500'e)
+        const targetScore = 3500;
         let lives = 3;
         
         const jerry = document.getElementById('jerry');
@@ -243,7 +241,7 @@
         const livesDisplay = document.getElementById('lives-display');
         
         let items = [];
-        let animationFrameId; // 60 FPS döngüsü için eklendi
+        let animationFrameId; 
         let itemLoop;
         let isInvincible = false; 
 
@@ -388,34 +386,54 @@
             jerry.style.left = lanes[currentLane] + '%';
             setTimeout(() => {
                 if(gameActive) tom.style.left = lanes[currentLane] + '%';
-            }, 300); // Tom'un tepki süresini biraz uzattık (gerçekçilik katar)
+            }, 300); 
         }
 
-        // ---------- Nesneler ----------
+        // ---------- Akıllı Nesne Sistemi ----------
         const obstacleEmojis = ['🪤'];
         let consecutiveObstacles = 0;
+        let consecutiveCheese = 0;
+        let lastLane = -1;
         
         function spawnItem() {
             if(!gameActive) return;
+            // Ekranda çok fazla nesne birikmesini engelle
             if(items.filter(i => i.dataset.type !== 'finish').length >= 6) return; 
             
             const item = document.createElement('div');
-            const forceCheese = consecutiveObstacles >= 2; 
-            const isCheese = forceCheese || Math.random() < 0.30;
+            let isCheese = false;
             
-            if(isCheese) {
+            // Aynı eşyaların üst üste gelmesini engelleme algoritması
+            if (consecutiveObstacles >= 2) {
+                isCheese = true; // 2 tuzaktan sonra mutlaka peynir
+            } else if (consecutiveCheese >= 1) {
+                isCheese = false; // Üst üste birden fazla peynir gelmesin
+            } else {
+                isCheese = Math.random() < 0.20; // Normal şans (%20)
+            }
+            
+            if (isCheese) {
                 item.className = 'entity cheese';
                 item.innerText = '🧀'; 
                 item.dataset.type = "cheese";
+                consecutiveCheese++;
                 consecutiveObstacles = 0;
             } else {
                 item.className = 'entity obstacle';
                 item.innerText = obstacleEmojis[Math.floor(Math.random() * obstacleEmojis.length)];
                 item.dataset.type = "obstacle";
                 consecutiveObstacles++;
+                consecutiveCheese = 0;
             }
             
-            const laneIdx = Math.floor(Math.random() * 3);
+            // Aynı şeritte üst üste eşya çıkma ihtimalini düşüren algoritma
+            let laneIdx;
+            do {
+                laneIdx = Math.floor(Math.random() * 3);
+            } while (laneIdx === lastLane && Math.random() > 0.3); // Aynı şerit gelirse %70 ihtimalle tekrar şerit seçer
+            
+            lastLane = laneIdx;
+            
             item.style.left = lanes[laneIdx] + '%';
             item.dataset.z = 2500; 
             item.dataset.lane = laneIdx;
@@ -454,17 +472,17 @@
             setTimeout(() => {
                 isInvincible = false;
                 jerry.classList.remove('hit-effect');
-            }, 500); // Yenilmezlik süresini biraz uzattık (oyuncuyu korur)
+            }, 500); 
         }
 
-        // ---------- FPS Bazlı Hız Sistemi (60 FPS için uyarlandı) ----------
-        let currentSpeed = 15; 
-        let currentSpawnRate = 500;
+        // ---------- Artırılmış Zorluk (Başlangıç Hızı ve İvmelenme) ----------
+        let currentSpeed = 19; // 15'ten 19'a çıkarıldı (Daha hızlı başlangıç)
+        let currentSpawnRate = 400; // 500'den 400'e düşürüldü (Daha sık eşya)
         
         function adjustDifficulty() {
-            // Hızlanma matematiği 60 FPS'e göre ayarlandı
-            currentSpeed = 14 + Math.min(10, Math.floor(score / 600) * 1.5);
-            const newSpawnRate = Math.max(250, 500 - Math.floor(score / 500) * 20);
+            // Zorluk çok daha hızlı ve agresif artacak şekilde ayarlandı
+            currentSpeed = 19 + Math.min(15, Math.floor(score / 350) * 1.8);
+            const newSpawnRate = Math.max(180, 400 - Math.floor(score / 350) * 25);
             
             if (newSpawnRate !== currentSpawnRate) {
                 currentSpawnRate = newSpawnRate;
@@ -473,11 +491,10 @@
             }
         }
 
-        // setInterval yerine requestAnimationFrame kullanılarak oyun akıcı hale getirildi
         function update() {
             if(!gameActive) return;
             
-            score += 1.25; // 60 FPS olduğu için puan artışını dengeledik
+            score += 1.25; 
             scoreDisplay.innerText = "Mesafe: " + Math.floor(score);
             adjustDifficulty();
 
@@ -493,7 +510,6 @@
                 item.dataset.z = currentZ;
                 item.style.bottom = currentZ + 'px';
 
-                // Hitbox algılama aralığı uyarlandı
                 if(currentZ < 280 && currentZ > 200) {
                     if(item.dataset.type === "finish") {
                         winGame();
@@ -519,7 +535,6 @@
                 }
             }
             
-            // Döngüyü tarayıcı ekran yenileme hızına bağlar (Genelde 60 FPS)
             animationFrameId = requestAnimationFrame(update);
         }
 
@@ -531,14 +546,16 @@
                 document.getElementById('start-screen').classList.add('hidden');
                 
                 gameActive = true;
-                currentSpeed = 15;
-                currentSpawnRate = 500;
+                currentSpeed = 19;
+                currentSpawnRate = 400;
                 consecutiveObstacles = 0;
+                consecutiveCheese = 0;
+                lastLane = -1;
                 
                 updatePositions();
                 updateLivesText();
                 
-                animationFrameId = requestAnimationFrame(update); // Akıcı motor başladı
+                animationFrameId = requestAnimationFrame(update); 
                 itemLoop = setInterval(spawnItem, currentSpawnRate);
                 startMusic();
             } catch (e) {
