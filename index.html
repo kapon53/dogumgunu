@@ -149,21 +149,26 @@
         #controls {
             position: absolute;
             bottom: 30px; left: 0; width: 100%;
-            display: flex; justify-content: center; gap: 40px;
+            display: flex; justify-content: space-between;
+            padding: 0 30px;
+            box-sizing: border-box;
             z-index: 60;
+            pointer-events: none;
         }
         .ctrl-btn {
-            width: 70px; height: 70px;
+            width: 75px; height: 75px;
             border-radius: 50%;
             background: rgba(255,255,255,0.35);
             border: 3px solid #fff;
             color: #fff;
-            font-size: 30px;
+            font-size: 32px;
             display: flex; align-items: center; justify-content: center;
             cursor: pointer;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            pointer-events: auto;
+            touch-action: manipulation;
         }
         .ctrl-btn:active { background: rgba(255,255,255,0.6); transform: scale(0.92); }
     </style>
@@ -287,6 +292,30 @@
                 setTimeout(() => playTone(f, 0.25, 'triangle', 0.3), i * 150);
             });
         }
+        function playLoseSound() {
+            [200, 160, 120, 80].forEach((f, i) => {
+                setTimeout(() => playTone(f, 0.3, 'sawtooth', 0.3), i * 120);
+            });
+        }
+
+        // Basit kovalamaca müziği (bas + vurgu deseni, döngü halinde)
+        let musicInterval;
+        let musicStep = 0;
+        const bassPattern = [130.81, 130.81, 164.81, 130.81, 196.00, 164.81, 130.81, 146.83];
+        function startMusic() {
+            stopMusic();
+            if (!soundOn) return;
+            musicStep = 0;
+            musicInterval = setInterval(() => {
+                if (!gameActive) return;
+                const note = bassPattern[musicStep % bassPattern.length];
+                playTone(note, 0.14, 'triangle', 0.12);
+                if (musicStep % 2 === 0) playTone(note * 2, 0.06, 'square', 0.04);
+                musicStep++;
+            }, 190);
+        }
+        function stopMusic() {
+            clearInterval(musicInterval);
         }
 
         // ---------- Jerry'nin beyaz arkaplanını şeffaflaştırma (canvas) ----------
@@ -482,15 +511,20 @@
         }
 
         function startGame() {
-            document.getElementById('start-screen').classList.add('hidden');
-            gameActive = true;
-            currentSpeed = 35;
-            currentSpawnRate = 500;
-            updatePositions();
-            updateLivesText();
-            gameLoop = setInterval(update, 30);
-            itemLoop = setInterval(spawnItem, currentSpawnRate);
-            startMusic();
+            try {
+                document.getElementById('start-screen').classList.add('hidden');
+                gameActive = true;
+                currentSpeed = 35;
+                currentSpawnRate = 500;
+                updatePositions();
+                updateLivesText();
+                gameLoop = setInterval(update, 30);
+                itemLoop = setInterval(spawnItem, currentSpawnRate);
+                startMusic();
+            } catch (e) {
+                console.error('Oyun başlatma hatası:', e);
+                document.getElementById('start-screen').classList.add('hidden');
+            }
         }
 
         function gameOver() {
