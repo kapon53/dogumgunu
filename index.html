@@ -16,6 +16,7 @@
             position: relative; 
             width: 100vw; 
             height: 100vh;
+            height: 100dvh;
             perspective: 800px; 
             display: flex; 
             justify-content: center; 
@@ -71,10 +72,10 @@
         #tom img { max-height: 160px; } 
         #jerry img { max-height: 100px; }
 
-        #jerry { left: 50%; bottom: 230px; z-index: 100; }
-        #tom { left: 50%; bottom: 20px; z-index: 101; }
-        .obstacle { font-size: 70px; }
-        .cheese { font-size: 65px; filter: drop-shadow(0 0 10px gold); }
+        #jerry { left: 50%; bottom: 260px; z-index: 100; }
+        #tom { left: 50%; bottom: 90px; z-index: 101; }
+        .obstacle { font-size: 65px; }
+        .cheese { font-size: 60px; }
 
         #hud { 
             position: absolute; 
@@ -399,6 +400,7 @@
 
         function spawnItem() {
             if(!gameActive) return;
+            if(items.filter(i => i.dataset.type !== 'finish').length >= 9) return; // aşırı yoğunluğu ve kasmayı önle
             const item = document.createElement('div');
             const isCheese = Math.random() < 0.20;
             
@@ -451,7 +453,7 @@
             setTimeout(() => {
                 isInvincible = false;
                 jerry.classList.remove('hit-effect');
-            }, 1000); 
+            }, 250); 
         }
 
         // ---------- Kademeli Zorluk ----------
@@ -511,7 +513,10 @@
         }
 
         function startGame() {
+            if (gameActive) return; // çift tıklama/dokunma koruması
             try {
+                clearInterval(gameLoop);
+                clearInterval(itemLoop);
                 document.getElementById('start-screen').classList.add('hidden');
                 gameActive = true;
                 currentSpeed = 35;
