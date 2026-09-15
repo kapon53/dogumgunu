@@ -66,7 +66,6 @@
         /* Yüklediğin Resimlerin Boyut ve Gölge Ayarları - küçültüldü */
         .entity img {
             max-height: 95px;
-            filter: drop-shadow(0 15px 10px rgba(0,0,0,0.6));
         }
         
         #tom img { max-height: 160px; } 
@@ -234,7 +233,7 @@
     <script>
         let gameActive = false;
         let currentLane = 1; 
-        const lanes = [16.5, 50, 83.5]; 
+        const lanes = [30, 50, 70]; 
         
         let score = 0;
         const targetScore = 7000;  // yol biraz uzatıldı
@@ -398,20 +397,24 @@
         // Tek engel: fare kapanı
         const obstacleEmojis = ['🪤'];
 
+        let consecutiveObstacles = 0;
         function spawnItem() {
             if(!gameActive) return;
-            if(items.filter(i => i.dataset.type !== 'finish').length >= 9) return; // aşırı yoğunluğu ve kasmayı önle
+            if(items.filter(i => i.dataset.type !== 'finish').length >= 6) return; // aşırı yoğunluğu ve kasmayı önle
             const item = document.createElement('div');
-            const isCheese = Math.random() < 0.20;
+            const forceCheese = consecutiveObstacles >= 2; // üst üste 2 tuzaktan sonra mutlaka peynir gelsin
+            const isCheese = forceCheese || Math.random() < 0.30;
             
             if(isCheese) {
                 item.className = 'entity cheese';
                 item.innerText = '🧀'; 
                 item.dataset.type = "cheese";
+                consecutiveObstacles = 0;
             } else {
                 item.className = 'entity obstacle';
                 item.innerText = obstacleEmojis[Math.floor(Math.random() * obstacleEmojis.length)];
                 item.dataset.type = "obstacle";
+                consecutiveObstacles++;
             }
             
             const laneIdx = Math.floor(Math.random() * 3);
@@ -521,9 +524,10 @@
                 gameActive = true;
                 currentSpeed = 35;
                 currentSpawnRate = 500;
+                consecutiveObstacles = 0;
                 updatePositions();
                 updateLivesText();
-                gameLoop = setInterval(update, 30);
+                gameLoop = setInterval(update, 40);
                 itemLoop = setInterval(spawnItem, currentSpawnRate);
                 startMusic();
             } catch (e) {
