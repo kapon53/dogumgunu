@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eylül'ün Sürpriz Oyunu</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            overflow: hidden;
+        }
+
+        #game-container {
+            width: 400px;
+            height: 600px;
+            background: linear-gradient(#87CEEB, #e0f7fa);
+            position: relative;
+            overflow: hidden;
+            border: 4px solid #333;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* Yollar / Şeritler */
+        .lane {
+            position: absolute;
+            width: 33.33%;
+            height: 100%;
+            border-right: 2px dashed rgba(255, 255, 255, 0.5);
+        }
+        .lane:nth-child(1) { left: 0; }
+        .lane:nth-child(2) { left: 33.33%; }
+        .lane:nth-child(3) { left: 66.66%; border-right: none; }
+
+        /* Karakterler */
+        .entity {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            font-size: 50px;
+            text-align: center;
+            line-height: 60px;
+            transition: left 0.1s ease-in-out;
+            transform: translateX(-50%);
+        }
+
+        #jerry {
+            bottom: 100px;
+            z-index: 10;
+        }
+
+        #tom {
+            bottom: 10px;
+            z-index: 9;
+            opacity: 0.8;
+            font-size: 60px; /* Tom biraz daha büyük */
+        }
+
+        .obstacle {
+            top: -60px;
+            z-index: 5;
+        }
+
+        .finish-line {
+            width: 100%;
+            height: 20px;
+            background: repeating-linear-gradient(90deg, white, white 20px, black 20px, black 40px);
+            position: absolute;
+            top: -50px;
+            z-index: 1;
+        }
+
+        /* Ekranlar (Başlangıç, Hediye, Mesaj) */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 20;
+            text-align: center;
+        }
+
+        .hidden { display: none !important; }
+
+        button {
+            padding: 15px 30px;
+            font-size: 20px;
+            background-color: #ff69b4;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        button:hover { background-color: #ff1493; }
+
+        /* Hediye Kutusu ve Son Ekran */
+        #gift-box {
+            font-size: 100px;
+            cursor: pointer;
+            animation: bounce 1s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        #message-paper {
+            background-color: #fff0f5;
+            color: #333;
+            width: 80%;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(255, 105, 180, 0.5);
+            position: relative;
+        }
+
+        #message-paper h1 { color: #ff1493; margin-top: 0;}
+        
+        .flower {
+            position: absolute;
+            font-size: 40px;
+        }
+        .f1 { top: -20px; left: -20px; }
+        .f2 { top: -20px; right: -20px; }
+        .f3 { bottom: -20px; left: -20px; }
+        .f4 { bottom: -20px; right: -20px; }
+
+        #score-board {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            z-index: 15;
+            text-shadow: 2px 2px 4px black;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Arka plan müziği için (Kendi şarkını buraya ekleyebilirsin) -->
+    <!-- <audio id="bg-music" src="sarki.mp3" loop></audio> -->
+
+    <div id="game-container">
+        <!-- Şeritler -->
+        <div class="lane"></div>
+        <div class="lane"></div>
+        <div class="lane"></div>
+
+        <div id="score-board">Mesafe: 0</div>
+
+        <div id="tom" class="entity" style="left: 50%;">🐱</div>
+        <div id="jerry" class="entity" style="left: 50%;">🐭</div>
+
+        <!-- Başlangıç Ekranı -->
+        <div id="start-screen" class="screen">
+            <h2>Tom'dan Kaç!</h2>
+            <p>Engellere çarpma, bitiş çizgisine ulaş!</p>
+            <p>Kontroller: Sol ve Sağ Yön Tuşları (veya ekrana tıkla)</p>
+            <button onclick="startGame()">Oyuna Başla</button>
+        </div>
+
+        <!-- Kaybetme Ekranı -->
+        <div id="game-over-screen" class="screen hidden">
+            <h2>Yakalandın!</h2>
+            <button onclick="resetGame()">Tekrar Dene</button>
+        </div>
+
+        <!-- Hediye Ekranı (Bitiş çizgisinden sonra) -->
+        <div id="gift-screen" class="screen hidden" style="background-color: #ffb6c1;">
+            <h2 style="color: #333;">Tebrikler! Kaçmayı Başardın!</h2>
+            <div id="gift-box" onclick="openGift()">🎁</div>
+            <p style="color: #333; margin-top: 20px;">Hediyeni açmak için kutuya tıkla!</p>
+        </div>
+
+        <!-- Final Mesaj Ekranı -->
+        <div id="final-screen" class="screen hidden" style="background-color: #ffe4e1;">
+            <div id="message-paper">
+                <!-- Pembe Çiçekler -->
+                <div class="flower f1">🌸</div>
+                <div class="flower f2">🌺</div>
+                <div class="flower f3">🌷</div>
+                <div class="flower f4">🌸</div>
+                
+                <h1>İyi ki Doğdun Eylül!</h1>
+                <p>Buraya Eylül için içinden gelen o güzel doğum günü mesajını yazabilirsin. Umarım bu minik oyunu oynarken yüzünde bir tebessüm oluşmuştur!</p>
+                <p><strong>- Arkadaşın</strong></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const jerry = document.getElementById('jerry');
+        const tom = document.getElementById('tom');
+        const container = document.getElementById('game-container');
+        const scoreBoard = document.getElementById('score-board');
+        
+        let currentLane = 1; // 0: Sol, 1: Orta, 2: Sağ
+        const lanePositions = [16.66, 50, 83.33]; // Yüzdelik olarak şerit merkezleri
+        
+        let gameInterval;
+        let obstacleInterval;
+        let score = 0;
+        let isGameActive = false;
+        let targetScore = 1500; // Bitiş çizgisi mesafesi
+        let obstacles = [];
+        let finishLine = null;
+
+        // Kontroller
+        document.addEventListener('keydown', (e) => {
+            if (!isGameActive) return;
+            if (e.key === 'ArrowLeft' && currentLane > 0) {
+                currentLane--;
+                updateJerryPosition();
+            } else if (e.key === 'ArrowRight' && currentLane < 2) {
+                currentLane++;
+                updateJerryPosition();
+            }
+        });
+
+        // Telefon için dokunmatik kontrol (Ekranın sağına/soluna tıklama)
+        container.addEventListener('touchstart', (e) => {
+            if (!isGameActive) return;
+            const clickX = e.touches[0].clientX - container.getBoundingClientRect().left;
+            if (clickX < container.offsetWidth / 2 && currentLane > 0) currentLane--;
+            else if (clickX > container.offsetWidth / 2 && currentLane < 2) currentLane++;
+            updateJerryPosition();
+        });
+
+        function updateJerryPosition() {
+            jerry.style.left = lanePositions[currentLane] + '%';
+            // Tom da biraz gecikmeli olarak Jerry'yi takip etsin
+            setTimeout(() => {
+                tom.style.left = lanePositions[currentLane] + '%';
+            }, 300);
+        }
+
+        function spawnObstacle() {
+            if (!isGameActive) return;
+            
+            const obstacle = document.createElement('div');
+            obstacle.classList.add('entity', 'obstacle');
+            // Engel görselini buradan değiştirebilirsin (Kaya vs.)
+            obstacle.innerText = '🪨'; 
+            
+            const randomLane = Math.floor(Math.random() * 3);
+            obstacle.style.left = lanePositions[randomLane] + '%';
+            obstacle.dataset.lane = randomLane;
+            obstacle.style.top = '-60px';
+            
+            container.appendChild(obstacle);
+            obstacles.push(obstacle);
+        }
+
+        function spawnFinishLine() {
+            finishLine = document.createElement('div');
+            finishLine.classList.add('finish-line');
+            container.appendChild(finishLine);
+        }
+
+        function updateGame() {
+            if (!isGameActive) return;
+            
+            score += 1;
+            scoreBoard.innerText = 'Mesafe: ' + score;
+
+            // Bitiş Çizgisi Mantığı
+            if (score >= targetScore && !finishLine) {
+                spawnFinishLine();
+            }
+
+            if (finishLine) {
+                let currentTop = parseFloat(finishLine.style.top) || -50;
+                finishLine.style.top = (currentTop + 5) + 'px'; // Bitiş çizgisi aşağı iniyor
+                
+                // Bitiş çizgisine değdi mi?
+                if (currentTop > 450) {
+                    winGame();
+                }
+            }
+
+            // Engelleri hareket ettir
+            obstacles.forEach((obs, index) => {
+                let currentTop = parseFloat(obs.style.top) || -60;
+                obs.style.top = (currentTop + 7) + 'px'; // Hız ayarı (7)
+
+                // Çarpışma Testi
+                const jerryRect = jerry.getBoundingClientRect();
+                const obsRect = obs.getBoundingClientRect();
+
+                if (
+                    obsRect.top < jerryRect.bottom &&
+                    obsRect.bottom > jerryRect.top &&
+                    parseInt(obs.dataset.lane) === currentLane
+                ) {
+                    gameOver();
+                }
+
+                // Ekrandan çıkan engeli temizle
+                if (currentTop > 600) {
+                    obs.remove();
+                    obstacles.splice(index, 1);
+                }
+            });
+        }
+
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            
+            // Müziği başlatmak istersen aşağıdaki satırın yorumunu kaldır
+            // document.getElementById('bg-music').play();
+
+            resetGameData();
+            isGameActive = true;
+            gameInterval = setInterval(updateGame, 20);
+            obstacleInterval = setInterval(spawnObstacle, 1000); // 1 saniyede 1 engel
+        }
+
+        function resetGameData() {
+            score = 0;
+            currentLane = 1;
+            updateJerryPosition();
+            obstacles.forEach(obs => obs.remove());
+            obstacles = [];
+            if (finishLine) {
+                finishLine.remove();
+                finishLine = null;
+            }
+        }
+
+        function gameOver() {
+            isGameActive = false;
+            clearInterval(gameInterval);
+            clearInterval(obstacleInterval);
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        function resetGame() {
+            resetGameData();
+            startGame();
+        }
+
+        function winGame() {
+            isGameActive = false;
+            clearInterval(gameInterval);
+            clearInterval(obstacleInterval);
+            document.getElementById('gift-screen').classList.remove('hidden');
+        }
+
+        function openGift() {
+            document.getElementById('gift-screen').classList.add('hidden');
+            document.getElementById('final-screen').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
