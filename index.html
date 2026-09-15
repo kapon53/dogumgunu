@@ -62,22 +62,19 @@
             align-items: flex-end;
         }
 
-        /* Yüklediğin Resimlerin Boyut ve Gölge Ayarları */
+        /* Yüklediğin Resimlerin Boyut ve Gölge Ayarları - küçültüldü */
         .entity img {
-            max-height: 130px;
+            max-height: 95px;
             filter: drop-shadow(0 15px 10px rgba(0,0,0,0.6));
         }
         
-        #tom img { max-height: 220px; } 
-        #jerry img { max-height: 140px; }
-        
-        /* Jerry'nin arka planı beyaz (jpg) olduğu için onu yola uyduran CSS hilesi */
-        #jerry img { mix-blend-mode: multiply; }
+        #tom img { max-height: 160px; } 
+        #jerry img { max-height: 100px; }
 
-        #jerry { left: 50%; bottom: 250px; z-index: 100; }
-        #tom { left: 50%; bottom: 10px; z-index: 101; }
-        .obstacle { font-size: 80px; }
-        .cheese { font-size: 70px; filter: drop-shadow(0 0 10px gold); }
+        #jerry { left: 50%; bottom: 230px; z-index: 100; }
+        #tom { left: 50%; bottom: 20px; z-index: 101; }
+        .obstacle { font-size: 70px; }
+        .cheese { font-size: 65px; filter: drop-shadow(0 0 10px gold); }
 
         #hud { 
             position: absolute; 
@@ -89,6 +86,20 @@
             gap: 30px;
         }
         .heart { color: red; }
+
+        #sound-toggle {
+            position: absolute;
+            top: 20px; right: 20px;
+            z-index: 50;
+            background: rgba(255,255,255,0.25);
+            border: 2px solid #fff;
+            border-radius: 50%;
+            width: 44px; height: 44px;
+            font-size: 20px;
+            color: white;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
 
         .screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
@@ -134,6 +145,27 @@
         .confetti { position: absolute; width: 10px; height: 10px; top: -10px; animation: fall 3s linear forwards; z-index: 150; }
         @keyframes fall { to { transform: translateY(100vh) rotate(720deg); } }
         .hit-effect { filter: brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(5); }
+
+        #controls {
+            position: absolute;
+            bottom: 30px; left: 0; width: 100%;
+            display: flex; justify-content: center; gap: 40px;
+            z-index: 60;
+        }
+        .ctrl-btn {
+            width: 70px; height: 70px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.35);
+            border: 3px solid #fff;
+            color: #fff;
+            font-size: 30px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        .ctrl-btn:active { background: rgba(255,255,255,0.6); transform: scale(0.92); }
     </style>
 </head>
 <body>
@@ -142,6 +174,7 @@
         <div id="score">Mesafe: 0</div>
         <div id="lives-display">Can: ❤️❤️❤️</div>
     </div>
+    <button id="sound-toggle" onclick="toggleSound()">🔊</button>
     
     <div id="game-container">
         <div id="road">
@@ -152,6 +185,11 @@
             <div id="tom" class="entity"><img src="25275.png" alt="Tom"></div>
             <div id="jerry" class="entity"><img src="25276.jpg" alt="Jerry"></div>
         </div>
+    </div>
+
+    <div id="controls">
+        <div class="ctrl-btn" id="btn-left">◀</div>
+        <div class="ctrl-btn" id="btn-right">▶</div>
     </div>
 
     <!-- Başlangıç -->
@@ -193,7 +231,7 @@
         const lanes = [16.5, 50, 83.5]; 
         
         let score = 0;
-        const targetScore = 5000; 
+        const targetScore = 7000;  // yol biraz uzatıldı
         let lives = 3;
         
         const jerry = document.getElementById('jerry');
@@ -206,6 +244,80 @@
         let gameLoop, itemLoop;
         let isInvincible = false; 
 
+        // ---------- Ses Sistemi (harici dosya gerektirmez) ----------
+        let soundOn = true;
+        let audioCtx = null;
+        function getAudioCtx() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            return audioCtx;
+        }
+        function toggleSound() {
+            soundOn = !soundOn;
+            document.getElementById('sound-toggle').innerText = soundOn ? '🔊' : '🔇';
+            if (!soundOn) stopMusic();
+            else if (gameActive) startMusic();
+        }
+        function playTone(freq, duration, type, vol) {
+            if (!soundOn) return;
+            try {
+                const ctx = getAudioCtx();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = type || 'sine';
+                osc.frequency.value = freq;
+                gain.gain.value = vol || 0.25;
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                osc.stop(ctx.currentTime + duration);
+            } catch (e) { /* sessiz geç */ }
+        }
+        function playHitSound() {
+            playTone(160, 0.25, 'sawtooth', 0.35);
+            setTimeout(() => playTone(90, 0.3, 'sawtooth', 0.3), 80);
+        }
+        function playCheeseSound() {
+            playTone(523.25, 0.1, 'sine', 0.3);
+            setTimeout(() => playTone(659.25, 0.12, 'sine', 0.3), 90);
+            setTimeout(() => playTone(783.99, 0.15, 'sine', 0.3), 180);
+        }
+        function playWinSound() {
+            [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+                setTimeout(() => playTone(f, 0.25, 'triangle', 0.3), i * 150);
+            });
+        }
+        }
+
+        // ---------- Jerry'nin beyaz arkaplanını şeffaflaştırma (canvas) ----------
+        function removeWhiteBackground(imgEl, threshold) {
+            threshold = threshold || 235;
+            function process() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = imgEl.naturalWidth;
+                    canvas.height = imgEl.naturalHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(imgEl, 0, 0);
+                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const d = imgData.data;
+                    for (let i = 0; i < d.length; i += 4) {
+                        if (d[i] > threshold && d[i+1] > threshold && d[i+2] > threshold) {
+                            d[i+3] = 0;
+                        }
+                    }
+                    ctx.putImageData(imgData, 0, 0);
+                    imgEl.src = canvas.toDataURL('image/png');
+                } catch (e) {
+                    console.warn('Arkaplan temizlenemedi:', e);
+                }
+            }
+            if (imgEl.complete && imgEl.naturalWidth > 0) process();
+            else imgEl.onload = process;
+        }
+        removeWhiteBackground(jerry.querySelector('img'));
+
+        // ---------- Oyun Mantığı ----------
         function updateLivesText() {
             let hearts = "";
             for(let i=0; i<lives; i++) hearts += "❤️";
@@ -224,10 +336,26 @@
 
         document.addEventListener('touchstart', (e) => {
             if(!gameActive) return;
+            if(e.target.closest('#controls')) return; // kontrol tuşları kendi mantığını çalıştırır
             const touchX = e.touches[0].clientX;
             if(touchX < window.innerWidth / 2 && currentLane > 0) currentLane--;
             else if(touchX >= window.innerWidth / 2 && currentLane < 2) currentLane++;
             updatePositions();
+        });
+
+        function moveLeft() {
+            if(!gameActive) return;
+            if(currentLane > 0) { currentLane--; updatePositions(); }
+        }
+        function moveRight() {
+            if(!gameActive) return;
+            if(currentLane < 2) { currentLane++; updatePositions(); }
+        }
+        const btnLeft = document.getElementById('btn-left');
+        const btnRight = document.getElementById('btn-right');
+        ['click', 'touchstart'].forEach(evt => {
+            btnLeft.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); moveLeft(); });
+            btnRight.addEventListener(evt, (e) => { e.preventDefault(); e.stopPropagation(); moveRight(); });
         });
 
         function updatePositions() {
@@ -236,6 +364,9 @@
                 if(gameActive) tom.style.left = lanes[currentLane] + '%';
             }, 250); 
         }
+
+        // Tek engel: fare kapanı
+        const obstacleEmojis = ['🪤'];
 
         function spawnItem() {
             if(!gameActive) return;
@@ -248,8 +379,7 @@
                 item.dataset.type = "cheese";
             } else {
                 item.className = 'entity obstacle';
-                const emojiList = ['🚧', '🪨', '🌵'];
-                item.innerText = emojiList[Math.floor(Math.random() * emojiList.length)];
+                item.innerText = obstacleEmojis[Math.floor(Math.random() * obstacleEmojis.length)];
                 item.dataset.type = "obstacle";
             }
             
@@ -278,6 +408,7 @@
 
         function takeDamage() {
             if(isInvincible) return;
+            playHitSound();
             lives--;
             updateLivesText();
             
@@ -294,10 +425,24 @@
             }, 1000); 
         }
 
+        // ---------- Kademeli Zorluk ----------
+        let currentSpeed = 35;
+        let currentSpawnRate = 500;
+        function adjustDifficulty() {
+            currentSpeed = 35 + Math.min(25, Math.floor(score / 600) * 3);
+            const newSpawnRate = Math.max(230, 500 - Math.floor(score / 500) * 18);
+            if (newSpawnRate !== currentSpawnRate) {
+                currentSpawnRate = newSpawnRate;
+                clearInterval(itemLoop);
+                itemLoop = setInterval(spawnItem, currentSpawnRate);
+            }
+        }
+
         function update() {
             if(!gameActive) return;
             score += 3;
             scoreDisplay.innerText = "Mesafe: " + score;
+            adjustDifficulty();
 
             if(score >= targetScore && !items.find(i => i.dataset.type === "finish")) {
                 spawnFinishLine();
@@ -307,7 +452,7 @@
                 let item = items[i];
                 let currentZ = parseFloat(item.dataset.z);
                 
-                currentZ -= 35; 
+                currentZ -= currentSpeed; 
                 item.dataset.z = currentZ;
                 item.style.bottom = currentZ + 'px';
 
@@ -317,6 +462,7 @@
                         return;
                     } else if(parseInt(item.dataset.lane) === currentLane) {
                         if(item.dataset.type === "cheese") {
+                            playCheeseSound();
                             if(lives < 5) lives++; 
                             updateLivesText();
                             item.remove();
@@ -338,16 +484,21 @@
         function startGame() {
             document.getElementById('start-screen').classList.add('hidden');
             gameActive = true;
+            currentSpeed = 35;
+            currentSpawnRate = 500;
             updatePositions();
             updateLivesText();
             gameLoop = setInterval(update, 30);
-            itemLoop = setInterval(spawnItem, 500); 
+            itemLoop = setInterval(spawnItem, currentSpawnRate);
+            startMusic();
         }
 
         function gameOver() {
             gameActive = false;
             clearInterval(gameLoop);
             clearInterval(itemLoop);
+            stopMusic();
+            playLoseSound();
             document.getElementById('game-over').classList.remove('hidden');
         }
 
@@ -355,6 +506,8 @@
             gameActive = false;
             clearInterval(gameLoop);
             clearInterval(itemLoop);
+            stopMusic();
+            playWinSound();
             document.getElementById('win-screen').classList.remove('hidden');
         }
 
