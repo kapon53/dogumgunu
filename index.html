@@ -35,9 +35,7 @@
             transform-style: preserve-3d;
             border-left: 20px solid #fff; 
             border-right: 20px solid #fff;
-            /* Performans iyileştirmesi için ağır gölge hafifletildi */
             box-shadow: 0 0 30px rgba(0,0,0,0.3);
-            will-change: transform;
         }
 
         .lane-line {
@@ -46,7 +44,6 @@
             height: 100%;
             background: repeating-linear-gradient(to top, #fff 0, #fff 100px, transparent 100px, transparent 200px);
             animation: moveRoad 0.6s linear infinite;
-            will-change: background-position;
         }
         .line-left { left: 33%; }
         .line-right { right: 33%; }
@@ -58,15 +55,15 @@
 
         .entity {
             position: absolute;
+            bottom: 0;
             transform-origin: bottom center;
             transform: translateX(-50%) rotateX(-75deg); 
-            transition: left 0.25s ease-in-out; 
             display: flex;
             justify-content: center;
             align-items: flex-end;
-            /* Kasmayı önleyen GPU hızlandırma kodu eklendi */
-            will-change: bottom, left, transform;
+            will-change: transform;
         }
+        #jerry, #tom { transition: left 0.25s ease-in-out; }
 
         .entity img {
             max-height: 95px;
@@ -75,8 +72,8 @@
         #tom img { max-height: 110px; } 
         #jerry img { max-height: 100px; }
 
-        #jerry { left: 50%; bottom: 260px; z-index: 100; }
-        #tom { left: 50%; bottom: 110px; z-index: 101; }
+        #jerry { left: 50%; bottom: 300px; z-index: 100; }
+        #tom { left: 50%; bottom: 90px; z-index: 101; }
         .obstacle { font-size: 65px; }
         .cheese { font-size: 60px; }
 
@@ -122,14 +119,65 @@
         button:active { transform: scale(0.95); }
 
         #gift-container { position: relative; width: 150px; height: 150px; margin-top: 30px; cursor: pointer; }
-        .gift-part { position: absolute; background-color: #ff1493; border: 4px solid #fff; border-radius: 10px; box-shadow: 0 10px 20px rgba(0,0,0,0.3); transition: all 0.8s cubic-bezier(0.68, -0.55, 0.27, 1.55); }
+        .gift-part { position: absolute; background-color: #ff1493; border: 4px solid #fff; border-radius: 10px; box-shadow: 0 10px 20px rgba(0,0,0,0.3); transition: all 1.92s cubic-bezier(0.68, -0.55, 0.27, 1.55); }
         #gift-base { bottom: 0; left: 10px; width: 120px; height: 100px; }
         #gift-lid { top: 10px; left: 0; width: 140px; height: 40px; z-index: 2; }
         #gift-ribbon-v { position: absolute; left: 50%; transform: translateX(-50%); width: 20px; height: 100%; background: #ffd700; }
         #gift-ribbon-h { position: absolute; top: 50%; transform: translateY(-50%); width: 100%; height: 20px; background: #ffd700; }
-        
+
+        /* Tıklamadan önce kutu hafifçe sallanıp kapağı oynatsın (dikkat çeksin) */
+        @keyframes giftWobble {
+            0%, 100% { transform: rotate(0deg); }
+            20% { transform: rotate(-4deg); }
+            40% { transform: rotate(3deg); }
+            60% { transform: rotate(-2deg); }
+            80% { transform: rotate(2deg); }
+        }
+        @keyframes lidJiggle {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-4px) rotate(-4deg); }
+        }
+        #gift-container:not(.open) { animation: giftWobble 1.8s ease-in-out infinite; transform-origin: bottom center; }
+        #gift-container:not(.open) #gift-lid { animation: lidJiggle 1.8s ease-in-out infinite; }
+
+        /* Tıklanınca önce enlemine şişsin, sonra sönerek kaybolsun */
+        @keyframes giftOpenBase {
+            0% { transform: scale(1); opacity: 1; }
+            30% { transform: scaleX(1.3) scaleY(0.92); opacity: 1; }
+            55% { transform: scaleX(1.08) scaleY(1.04); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0; }
+        }
         .open #gift-lid { transform: translateY(-80px) rotate(-15deg); opacity: 0; }
-        .open #gift-base { transform: scale(0.9); opacity: 0; }
+        .open #gift-base { animation: giftOpenBase 1.92s ease-in-out forwards; }
+
+        /* Hediye açılınca çıkan ışık patlaması */
+        .light-burst {
+            position: fixed;
+            width: 40px; height: 40px;
+            transform: translate(-50%, -50%) scale(1);
+            background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,223,120,0.75) 35%, rgba(255,223,120,0) 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 160;
+            animation: lightBurst 0.8s ease-out forwards;
+        }
+        @keyframes lightBurst {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(9); opacity: 0; }
+        }
+        .light-ray {
+            position: fixed;
+            width: 6px; height: 120px;
+            background: linear-gradient(to top, rgba(255,223,120,0.9), rgba(255,223,120,0));
+            transform-origin: bottom center;
+            pointer-events: none;
+            z-index: 159;
+            animation: rayBurst 0.7s ease-out forwards;
+        }
+        @keyframes rayBurst {
+            0% { opacity: 1; transform: translate(-50%, -100%) rotate(var(--ray-angle)) scaleY(0.3); }
+            100% { opacity: 0; transform: translate(-50%, -100%) rotate(var(--ray-angle)) scaleY(1.4); }
+        }
 
         #message-paper {
             background: #fff0f5; color: #333; padding: 40px; border-radius: 15px;
@@ -145,8 +193,28 @@
         .f3 { bottom: -30px; left: -30px; transform: scaleY(-1); }
         .f4 { bottom: -30px; right: -30px; transform: scale(-1, -1); }
 
-        .confetti { position: absolute; width: 10px; height: 10px; top: -10px; animation: fall 3s linear forwards; z-index: 150; }
-        @keyframes fall { to { transform: translateY(100vh) rotate(720deg); } }
+        .confetti { position: fixed; top: 0; left: 0; z-index: 150; animation: confettiBurst ease-out forwards; }
+        @keyframes confettiBurst {
+            0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+            65% { transform: translate(var(--dx), var(--dy)) rotate(calc(var(--spin) * 0.6)); opacity: 1; }
+            100% { transform: translate(var(--dx), calc(var(--dy) + 260px)) rotate(var(--spin)); opacity: 0; }
+        }
+
+        /* Mesaj açıldıktan sonra süzülen pembe kar taneleri */
+        .pink-flake {
+            position: fixed;
+            top: -10px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,182,213,0.95), rgba(255,182,213,0));
+            pointer-events: none;
+            z-index: 140;
+            animation: pinkFall linear forwards;
+        }
+        @keyframes pinkFall {
+            0% { transform: translate(0, 0); opacity: 0; }
+            10% { opacity: 1; }
+            100% { transform: translate(var(--drift), 110vh); opacity: 0.3; }
+        }
         .hit-effect { filter: brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(5); }
 
         #controls {
@@ -201,7 +269,14 @@
 
     <div id="start-screen" class="screen">
         <h1 style="color: #ff69b4;">Eylül'ün Kaçış Serüveni</h1>
-        <p style="font-size: 20px; max-width: 400px;">Tom peşinde! Yoldaki engellere dikkat et. Peynirleri toplayarak can kazanabilirsin!</p>
+        <p style="font-size: 20px; max-width: 400px; margin-bottom: 5px;">Tom peşinde! Yoldaki tuzaklara dikkat et, peynirleri toplayarak can kazanabilirsin!</p>
+        <div style="max-width: 420px; background: rgba(255,255,255,0.12); border-radius: 16px; padding: 16px 20px; margin-top: 10px; text-align: left; font-size: 16px; line-height: 1.6;">
+            <strong style="color: #ff69b4;">Nasıl Oynanır?</strong><br>
+            🕹️ Alt köşedeki ◀ ▶ tuşlarına (veya klavyede sağ/sol ok tuşlarına) basarak şerit değiştir<br>
+            🪤 Tuzaklara değme, can kaybedersin<br>
+            🧀 Peynirleri topla, can kazan (en fazla 5 can)<br>
+            🏁 Yeterince ilerleyip bitiş çizgisine ulaş, kazan!
+        </div>
         <button onclick="startGame()">Maceraya Başla</button>
     </div>
 
@@ -235,7 +310,6 @@
         const lanes = [30, 50, 70]; 
         
         let score = 0;
-        // Oyun hedefi 3500'den 2500'e düşürüldü (Oyun süresi kısaldı)
         const targetScore = 2500;
         let lives = 3;
         
@@ -245,7 +319,6 @@
         const scoreDisplay = document.getElementById('score');
         const livesDisplay = document.getElementById('lives-display');
         
-        // KASMAYI ÖNLEYEN YENİ HAFIZA SİSTEMİ
         let activeItems = [];
         let animationFrameId; 
         let itemLoop;
@@ -352,15 +425,27 @@
             livesDisplay.innerText = "Can: " + hearts;
         }
 
-        document.addEventListener('keydown', (e) => {
+        function handleGameKey(e) {
+            if(e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'a' || e.key === 'd' || e.key === 'A' || e.key === 'D') {
+                e.preventDefault();
+            }
             if(!gameActive) return;
-            if((e.key === 'ArrowLeft' || e.key === 'a') && currentLane > 0) {
+            if((e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') && currentLane > 0) {
                 currentLane--; updatePositions();
             }
-            if((e.key === 'ArrowRight' || e.key === 'd') && currentLane < 2) {
+            if((e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') && currentLane < 2) {
                 currentLane++; updatePositions();
             }
-        });
+        }
+        // Tek dinleyici, capture aşamasında - odak başka bir elemana geçse bile çalışır
+        document.addEventListener('keydown', handleGameKey, { passive: false, capture: true });
+
+        // Herhangi bir düğmeye tıklanınca odağın orada takılı kalmasını önle
+        document.addEventListener('pointerdown', (e) => {
+            if(document.activeElement && document.activeElement !== document.body && document.activeElement.blur) {
+                document.activeElement.blur();
+            }
+        }, true);
 
         document.addEventListener('touchstart', (e) => {
             if(!gameActive) return;
@@ -393,11 +478,16 @@
             }, 300); 
         }
 
-        // ---------- Optimize Edilmiş Eşya Sistemi ----------
+        // ---------- Eşya Sistemi ----------
         const obstacleEmojis = ['🪤'];
         let consecutiveObstacles = 0;
         let consecutiveCheese = 0;
         let lastLane = -1;
+
+        // Bir öğenin görünür konumunu ayarla (bottom yerine transform kullanılır - reflow tetiklemez, GPU'da kompozit edilir)
+        function setItemDepth(el, z) {
+            el.style.transform = 'translate(-50%, ' + (-z) + 'px) rotateX(-75deg)';
+        }
         
         function spawnItem() {
             if(!gameActive) return;
@@ -410,7 +500,7 @@
             } else if (consecutiveCheese >= 1) {
                 isCheese = false; 
             } else {
-                isCheese = Math.random() < 0.20; 
+                isCheese = Math.random() < 0.18; 
             }
             
             let typeStr = isCheese ? 'cheese' : 'obstacle';
@@ -435,11 +525,10 @@
             el.className = 'entity ' + typeStr;
             el.innerText = itemText;
             el.style.left = lanes[laneIdx] + '%';
-            el.style.bottom = '2500px'; 
+            setItemDepth(el, 2500);
             
             road.appendChild(el);
             
-            // HTML dataset yerine her şeyi Javascript objesine aktardık (Kasmayı önler)
             activeItems.push({
                 el: el,
                 z: 2500,
@@ -455,7 +544,7 @@
             finish.innerText = '🏁';
             finish.style.left = '50%';
             finish.style.fontSize = '250px';
-            finish.style.bottom = '2500px';
+            setItemDepth(finish, 2500);
             road.appendChild(finish);
             
             activeItems.push({
@@ -482,7 +571,7 @@
             setTimeout(() => {
                 isInvincible = false;
                 jerry.classList.remove('hit-effect');
-            }, 500); 
+            }, 250); 
         }
 
         let currentSpeed = 19; 
@@ -510,19 +599,17 @@
                 spawnFinishLine();
             }
 
-            // HTML içinden değil, doğrudan hızlı RAM dizisinden (array) okuyoruz
             for(let i = activeItems.length - 1; i >= 0; i--) {
                 let item = activeItems[i];
                 item.z -= currentSpeed; 
-                item.el.style.bottom = item.z + 'px';
+                setItemDepth(item.el, item.z);
 
-                // ÇARPIŞMA PENCERESİ GENİŞLETİLDİ (150 ile 320 arası) - Artık kaçırmayacak
-                if(item.z < 320 && item.z > 150 && !item.hit) {
+                if(item.z < 380 && item.z > 90 && !item.hit) {
                     if(item.type === "finish") {
                         winGame();
                         return;
                     } else if(item.lane === currentLane) {
-                        item.hit = true; // Aynı eşyaya iki kez çarpılmasını önler
+                        item.hit = true;
                         if(item.type === "cheese") {
                             playCheeseSound();
                             if(lives < 5) lives++; 
@@ -554,11 +641,11 @@
                 cancelAnimationFrame(animationFrameId);
                 clearInterval(itemLoop);
                 
-                // Ekrandaki eski eşyaları temizle
                 activeItems.forEach(item => item.el.remove());
                 activeItems = [];
                 
                 document.getElementById('start-screen').classList.add('hidden');
+                if (document.activeElement) document.activeElement.blur();
                 
                 gameActive = true;
                 currentSpeed = 19;
@@ -601,13 +688,80 @@
 
         function createConfetti() {
             const colors = ['#ff69b4', '#ff1493', '#ffd700', '#00ced1', '#87cefa'];
-            for(let i=0; i<80; i++) {
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const originY = vh * 0.55;
+            const count = 90;
+
+            for(let i = 0; i < count; i++) {
+                const fromLeft = i % 2 === 0;
                 let conf = document.createElement('div');
                 conf.className = 'confetti';
-                conf.style.left = Math.random() * 100 + 'vw';
+
+                const size = 8 + Math.random() * 8;
+                conf.style.width = size + 'px';
+                conf.style.height = size + 'px';
+                if (Math.random() > 0.5) conf.style.borderRadius = '50%';
                 conf.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-                conf.style.animationDuration = (Math.random() * 2 + 2) + 's'; 
+                conf.style.boxShadow = '0 0 6px rgba(255,255,255,0.6)';
+
+                conf.style.left = (fromLeft ? -10 : vw + 10) + 'px';
+                conf.style.top = originY + 'px';
+
+                const dx = fromLeft
+                    ? (180 + Math.random() * (vw * 0.45))
+                    : -(180 + Math.random() * (vw * 0.45));
+                const dy = -(100 + Math.random() * 260);
+                conf.style.setProperty('--dx', dx + 'px');
+                conf.style.setProperty('--dy', dy + 'px');
+                conf.style.setProperty('--spin', (Math.random() * 720 - 360) + 'deg');
+                conf.style.animationDuration = (1.1 + Math.random() * 0.6) + 's';
+
                 document.body.appendChild(conf);
+                setTimeout(() => conf.remove(), 2200);
+            }
+        }
+
+        let pinkSnowInterval;
+        function startPinkSnow() {
+            clearInterval(pinkSnowInterval);
+            pinkSnowInterval = setInterval(() => {
+                const flake = document.createElement('div');
+                flake.className = 'pink-flake';
+                const size = 4 + Math.random() * 5;
+                flake.style.width = size + 'px';
+                flake.style.height = size + 'px';
+                flake.style.left = Math.random() * 100 + 'vw';
+                flake.style.setProperty('--drift', (Math.random() * 80 - 40) + 'px');
+                flake.style.animationDuration = (4.5 + Math.random() * 3) + 's';
+                document.body.appendChild(flake);
+                setTimeout(() => flake.remove(), 8000);
+            }, 280);
+        }
+
+        // Hediye kutusunun ortasından çıkan ışık patlaması + ışın demetleri
+        function createLightBurst() {
+            const rect = document.getElementById('gift-container').getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+
+            const burst = document.createElement('div');
+            burst.className = 'light-burst';
+            burst.style.left = cx + 'px';
+            burst.style.top = cy + 'px';
+            document.body.appendChild(burst);
+            setTimeout(() => burst.remove(), 850);
+
+            const rayCount = 10;
+            for (let i = 0; i < rayCount; i++) {
+                const ray = document.createElement('div');
+                ray.className = 'light-ray';
+                const angle = (360 / rayCount) * i;
+                ray.style.setProperty('--ray-angle', angle + 'deg');
+                ray.style.left = cx + 'px';
+                ray.style.top = cy + 'px';
+                document.body.appendChild(ray);
+                setTimeout(() => ray.remove(), 750);
             }
         }
 
@@ -619,14 +773,18 @@
             document.getElementById('click-text').style.display = 'none';
             document.getElementById('win-title').style.display = 'none';
 
+            // Kapak açılır açılmaz ışık patlaması ve konfeti birlikte patlasın
+            createLightBurst();
+            createConfetti();
+
             setTimeout(() => {
                 giftContainer.style.display = 'none'; 
-                createConfetti(); 
                 
+                // Işık ve konfeti bittikten sonra mesaj ortaya çıksın
                 const paper = document.getElementById('message-paper');
                 paper.style.display = 'block';
-                setTimeout(() => { paper.classList.add('show'); }, 50); 
-            }, 800); 
+                setTimeout(() => { paper.classList.add('show'); startPinkSnow(); }, 50); 
+            }, 1920); 
         }
     </script>
 </body>
