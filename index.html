@@ -125,7 +125,6 @@
         #gift-ribbon-v { position: absolute; left: 50%; transform: translateX(-50%); width: 20px; height: 100%; background: #ffd700; }
         #gift-ribbon-h { position: absolute; top: 50%; transform: translateY(-50%); width: 100%; height: 20px; background: #ffd700; }
 
-        /* Tıklamadan önce kutu hafifçe sallanıp kapağı oynatsın (dikkat çeksin) */
         @keyframes giftWobble {
             0%, 100% { transform: rotate(0deg); }
             20% { transform: rotate(-4deg); }
@@ -140,7 +139,6 @@
         #gift-container:not(.open) { animation: giftWobble 1.8s ease-in-out infinite; transform-origin: bottom center; }
         #gift-container:not(.open) #gift-lid { animation: lidJiggle 1.8s ease-in-out infinite; }
 
-        /* Tıklanınca önce enlemine şişsin, sonra sönerek kaybolsun */
         @keyframes giftOpenBase {
             0% { transform: scale(1); opacity: 1; }
             30% { transform: scaleX(1.3) scaleY(0.92); opacity: 1; }
@@ -150,7 +148,6 @@
         .open #gift-lid { transform: translateY(-80px) rotate(-15deg); opacity: 0; }
         .open #gift-base { animation: giftOpenBase 1.92s ease-in-out forwards; }
 
-        /* Hediye açılınca çıkan ışık patlaması */
         .light-burst {
             position: fixed;
             width: 40px; height: 40px;
@@ -200,7 +197,6 @@
             100% { transform: translate(var(--dx), calc(var(--dy) + 260px)) rotate(var(--spin)); opacity: 0; }
         }
 
-        /* Mesaj açıldıktan sonra süzülen pembe kar taneleri */
         .pink-flake {
             position: fixed;
             top: -10px;
@@ -438,10 +434,9 @@
                 currentLane++; updatePositions();
             }
         }
-        // Tek dinleyici, capture aşamasında - odak başka bir elemana geçse bile çalışır
+        
         document.addEventListener('keydown', handleGameKey, { passive: false, capture: true });
 
-        // Herhangi bir düğmeye tıklanınca odağın orada takılı kalmasını önle
         document.addEventListener('pointerdown', (e) => {
             if(document.activeElement && document.activeElement !== document.body && document.activeElement.blur) {
                 document.activeElement.blur();
@@ -485,10 +480,45 @@
         let consecutiveCheese = 0;
         let lastLane = -1;
 
-        // Bir öğenin görünür konumunu ayarla (bottom yerine transform kullanılır - reflow tetiklemez, GPU'da kompozit edilir)
         function setItemDepth(el, z) {
             el.style.transform = 'translate(-50%, ' + (-z) + 'px) rotateX(-75deg)';
         }
+        
+        function spawnItem() {
+            if(!gameActive) return;
+            if(activeItems.filter(i => i.type !== 'finish').length >= 6) return; 
+            
+            let isCheese = false;
+            
+            if (consecutiveObstacles >= 2) {
+                isCheese = true; 
+            } else if (consecutiveCheese >= 1) {
+                isCheese = false; 
+            } else {
+                isCheese = Math.random() < 0.20; 
+            }
+            
+            let typeStr = isCheese ? 'cheese' : 'obstacle';
+            let itemText = isCheese ? '🧀' : obstacleEmojis[Math.floor(Math.random() * obstacleEmojis.length)];
+            
+            if(isCheese) {
+                consecutiveCheese++;
+                consecutiveObstacles = 0;
+            } else {
+                consecutiveObstacles++;
+                consecutiveCheese = 0;
+            }
+            
+            let laneIdx;
+            do {
+                laneIdx = Math.floor(Math.random() * 3);
+            } while (laneIdx === lastLane && Math.random() > 0.3); 
+            
+            lastLane = laneIdx;
+            
+            const el = document.createElement('div');
+            el.className = 'entity ' + typeStr;
+            el.innerText = itemText;
             el.style.left = lanes[laneIdx] + '%';
             setItemDepth(el, 2500);
             
@@ -555,6 +585,17 @@
 
         function update() {
             if(!gameActive) return;
+            
+            score += 1.25; 
+            scoreDisplay.innerText = "Mesafe: " + Math.floor(score);
+            adjustDifficulty();
+
+            if(score >= targetScore && !activeItems.find(i => i.type === "finish")) {
+                spawnFinishLine();
+            }
+
+            for(let i = activeItems.length - 1; i >= 0; i--) {
+                let item = activeItems[i];
                 item.z -= currentSpeed; 
                 setItemDepth(item.el, item.z);
 
@@ -620,6 +661,21 @@
                 console.error('Oyun başlatma hatası:', e);
                 document.getElementById('start-screen').classList.add('hidden');
             }
+        }
+
+        function gameOver() {
+            gameActive = false;
+            cancelAnimationFrame(animationFrameId);
+            clearInterval(itemLoop);
+            stopMusic();
+            playLoseSound();
+            document.getElementById('game-over').classList.remove('hidden');
+        }
+
+        function winGame() {
+            gameActive = false;
+            cancelAnimationFrame(animationFrameId);
+            clearInterval(itemLoop);
             stopMusic();
             playWinSound();
             document.getElementById('win-screen').classList.remove('hidden');
@@ -637,7 +693,6 @@
                 let conf = document.createElement('div');
                 conf.className = 'confetti';
 
-                // Klasik şerit konfeti görünümü: dikdörtgen, parlama efekti yok
                 const isStrip = Math.random() > 0.35;
                 const w = isStrip ? (4 + Math.random() * 4) : (7 + Math.random() * 4);
                 const h = isStrip ? (10 + Math.random() * 8) : w;
@@ -680,7 +735,6 @@
             }, 280);
         }
 
-        // Hediye kutusunun ortasından çıkan ışık patlaması + ışın demetleri
         function createLightBurst() {
             const rect = document.getElementById('gift-container').getBoundingClientRect();
             const cx = rect.left + rect.width / 2;
@@ -714,14 +768,12 @@
             document.getElementById('click-text').style.display = 'none';
             document.getElementById('win-title').style.display = 'none';
 
-            // Kapak açılır açılmaz ışık patlaması ve konfeti birlikte patlasın
             createLightBurst();
             createConfetti();
 
             setTimeout(() => {
                 giftContainer.style.display = 'none'; 
                 
-                // Işık ve konfeti bittikten sonra mesaj ortaya çıksın
                 const paper = document.getElementById('message-paper');
                 paper.style.display = 'block';
                 setTimeout(() => { paper.classList.add('show'); startPinkSnow(); }, 50); 
