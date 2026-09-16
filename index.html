@@ -35,7 +35,9 @@
             transform-style: preserve-3d;
             border-left: 20px solid #fff; 
             border-right: 20px solid #fff;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            /* Performans iyileştirmesi için ağır gölge hafifletildi */
+            box-shadow: 0 0 30px rgba(0,0,0,0.3);
+            will-change: transform;
         }
 
         .lane-line {
@@ -44,6 +46,7 @@
             height: 100%;
             background: repeating-linear-gradient(to top, #fff 0, #fff 100px, transparent 100px, transparent 200px);
             animation: moveRoad 0.6s linear infinite;
+            will-change: background-position;
         }
         .line-left { left: 33%; }
         .line-right { right: 33%; }
@@ -61,6 +64,8 @@
             display: flex;
             justify-content: center;
             align-items: flex-end;
+            /* Kasmayı önleyen GPU hızlandırma kodu eklendi */
+            will-change: bottom, left, transform;
         }
 
         .entity img {
@@ -230,8 +235,8 @@
         const lanes = [30, 50, 70]; 
         
         let score = 0;
-        // Oyun süresi kısaltıldı (7000'den 3500'e)
-        const targetScore = 3500;
+        // Oyun hedefi 3500'den 2500'e düşürüldü (Oyun süresi kısaldı)
+        const targetScore = 2500;
         let lives = 3;
         
         const jerry = document.getElementById('jerry');
@@ -240,7 +245,8 @@
         const scoreDisplay = document.getElementById('score');
         const livesDisplay = document.getElementById('lives-display');
         
-        let items = [];
+        // KASMAYI ÖNLEYEN YENİ HAFIZA SİSTEMİ
+        let activeItems = [];
         let animationFrameId; 
         let itemLoop;
         let isInvincible = false; 
@@ -332,9 +338,7 @@
                     }
                     ctx.putImageData(imgData, 0, 0);
                     imgEl.src = canvas.toDataURL('image/png');
-                } catch (e) {
-                    console.warn('Arkaplan temizlenemedi:', e);
-                }
+                } catch (e) {}
             }
             if (imgEl.complete && imgEl.naturalWidth > 0) process();
             else imgEl.onload = process;
@@ -389,7 +393,7 @@
             }, 300); 
         }
 
-        // ---------- Akıllı Nesne Sistemi ----------
+        // ---------- Optimize Edilmiş Eşya Sistemi ----------
         const obstacleEmojis = ['🪤'];
         let consecutiveObstacles = 0;
         let consecutiveCheese = 0;
@@ -397,50 +401,52 @@
         
         function spawnItem() {
             if(!gameActive) return;
-            // Ekranda çok fazla nesne birikmesini engelle
-            if(items.filter(i => i.dataset.type !== 'finish').length >= 6) return; 
+            if(activeItems.filter(i => i.type !== 'finish').length >= 6) return; 
             
-            const item = document.createElement('div');
             let isCheese = false;
             
-            // Aynı eşyaların üst üste gelmesini engelleme algoritması
             if (consecutiveObstacles >= 2) {
-                isCheese = true; // 2 tuzaktan sonra mutlaka peynir
+                isCheese = true; 
             } else if (consecutiveCheese >= 1) {
-                isCheese = false; // Üst üste birden fazla peynir gelmesin
+                isCheese = false; 
             } else {
-                isCheese = Math.random() < 0.20; // Normal şans (%20)
+                isCheese = Math.random() < 0.20; 
             }
             
-            if (isCheese) {
-                item.className = 'entity cheese';
-                item.innerText = '🧀'; 
-                item.dataset.type = "cheese";
+            let typeStr = isCheese ? 'cheese' : 'obstacle';
+            let itemText = isCheese ? '🧀' : obstacleEmojis[Math.floor(Math.random() * obstacleEmojis.length)];
+            
+            if(isCheese) {
                 consecutiveCheese++;
                 consecutiveObstacles = 0;
             } else {
-                item.className = 'entity obstacle';
-                item.innerText = obstacleEmojis[Math.floor(Math.random() * obstacleEmojis.length)];
-                item.dataset.type = "obstacle";
                 consecutiveObstacles++;
                 consecutiveCheese = 0;
             }
             
-            // Aynı şeritte üst üste eşya çıkma ihtimalini düşüren algoritma
             let laneIdx;
             do {
                 laneIdx = Math.floor(Math.random() * 3);
-            } while (laneIdx === lastLane && Math.random() > 0.3); // Aynı şerit gelirse %70 ihtimalle tekrar şerit seçer
+            } while (laneIdx === lastLane && Math.random() > 0.3); 
             
             lastLane = laneIdx;
             
-            item.style.left = lanes[laneIdx] + '%';
-            item.dataset.z = 2500; 
-            item.dataset.lane = laneIdx;
-            item.style.bottom = item.dataset.z + 'px';
+            const el = document.createElement('div');
+            el.className = 'entity ' + typeStr;
+            el.innerText = itemText;
+            el.style.left = lanes[laneIdx] + '%';
+            el.style.bottom = '2500px'; 
             
-            road.appendChild(item);
-            items.push(item);
+            road.appendChild(el);
+            
+            // HTML dataset yerine her şeyi Javascript objesine aktardık (Kasmayı önler)
+            activeItems.push({
+                el: el,
+                z: 2500,
+                lane: laneIdx,
+                type: typeStr,
+                hit: false
+            });
         }
 
         function spawnFinishLine() {
@@ -449,11 +455,15 @@
             finish.innerText = '🏁';
             finish.style.left = '50%';
             finish.style.fontSize = '250px';
-            finish.dataset.z = 2500;
-            finish.dataset.type = "finish";
-            finish.style.bottom = finish.dataset.z + 'px';
+            finish.style.bottom = '2500px';
             road.appendChild(finish);
-            items.push(finish);
+            
+            activeItems.push({
+                el: finish,
+                z: 2500,
+                type: 'finish',
+                hit: false
+            });
         }
 
         function takeDamage() {
@@ -475,12 +485,10 @@
             }, 500); 
         }
 
-        // ---------- Artırılmış Zorluk (Başlangıç Hızı ve İvmelenme) ----------
-        let currentSpeed = 19; // 15'ten 19'a çıkarıldı (Daha hızlı başlangıç)
-        let currentSpawnRate = 400; // 500'den 400'e düşürüldü (Daha sık eşya)
+        let currentSpeed = 19; 
+        let currentSpawnRate = 400; 
         
         function adjustDifficulty() {
-            // Zorluk çok daha hızlı ve agresif artacak şekilde ayarlandı
             currentSpeed = 19 + Math.min(15, Math.floor(score / 350) * 1.8);
             const newSpawnRate = Math.max(180, 400 - Math.floor(score / 350) * 25);
             
@@ -498,40 +506,42 @@
             scoreDisplay.innerText = "Mesafe: " + Math.floor(score);
             adjustDifficulty();
 
-            if(score >= targetScore && !items.find(i => i.dataset.type === "finish")) {
+            if(score >= targetScore && !activeItems.find(i => i.type === "finish")) {
                 spawnFinishLine();
             }
 
-            for(let i = items.length - 1; i >= 0; i--) {
-                let item = items[i];
-                let currentZ = parseFloat(item.dataset.z);
-                
-                currentZ -= currentSpeed; 
-                item.dataset.z = currentZ;
-                item.style.bottom = currentZ + 'px';
+            // HTML içinden değil, doğrudan hızlı RAM dizisinden (array) okuyoruz
+            for(let i = activeItems.length - 1; i >= 0; i--) {
+                let item = activeItems[i];
+                item.z -= currentSpeed; 
+                item.el.style.bottom = item.z + 'px';
 
-                if(currentZ < 280 && currentZ > 200) {
-                    if(item.dataset.type === "finish") {
+                // ÇARPIŞMA PENCERESİ GENİŞLETİLDİ (150 ile 320 arası) - Artık kaçırmayacak
+                if(item.z < 320 && item.z > 150 && !item.hit) {
+                    if(item.type === "finish") {
                         winGame();
                         return;
-                    } else if(parseInt(item.dataset.lane) === currentLane) {
-                        if(item.dataset.type === "cheese") {
+                    } else if(item.lane === currentLane) {
+                        item.hit = true; // Aynı eşyaya iki kez çarpılmasını önler
+                        if(item.type === "cheese") {
                             playCheeseSound();
                             if(lives < 5) lives++; 
                             updateLivesText();
-                            item.remove();
-                            items.splice(i, 1);
-                        } else if(item.dataset.type === "obstacle") {
+                            item.el.remove();
+                            activeItems.splice(i, 1);
+                            continue;
+                        } else if(item.type === "obstacle") {
                             takeDamage();
-                            item.remove();
-                            items.splice(i, 1);
+                            item.el.remove();
+                            activeItems.splice(i, 1);
+                            continue;
                         }
                     }
                 }
                 
-                if(currentZ < -100) {
-                    item.remove();
-                    items.splice(i, 1);
+                if(item.z < -100) {
+                    item.el.remove();
+                    activeItems.splice(i, 1);
                 }
             }
             
@@ -543,6 +553,11 @@
             try {
                 cancelAnimationFrame(animationFrameId);
                 clearInterval(itemLoop);
+                
+                // Ekrandaki eski eşyaları temizle
+                activeItems.forEach(item => item.el.remove());
+                activeItems = [];
+                
                 document.getElementById('start-screen').classList.add('hidden');
                 
                 gameActive = true;
@@ -551,6 +566,8 @@
                 consecutiveObstacles = 0;
                 consecutiveCheese = 0;
                 lastLane = -1;
+                score = 0;
+                lives = 3;
                 
                 updatePositions();
                 updateLivesText();
