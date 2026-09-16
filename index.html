@@ -299,6 +299,7 @@
             <div class="flower f3">🌷</div>
             <div class="flower f4">🌸</div>
             <h1>İyi ki Doğdun Eylül!</h1>
+            <img src="25318.png" alt="Tom ve Jerry" style="max-width: 100%; border-radius: 14px; margin-bottom: 15px; box-shadow: 0 6px 18px rgba(0,0,0,0.15);">
             <p>Buraya Eylül için en güzel doğum günü mesajını yazabilirsin. Umarım bu koşturmacanın sonunda yüzünü güldürebilmişimdir!</p>
             <p style="text-align: right; margin-top: 30px;"><strong>- Arkadaşın</strong></p>
         </div>
@@ -488,42 +489,6 @@
         function setItemDepth(el, z) {
             el.style.transform = 'translate(-50%, ' + (-z) + 'px) rotateX(-75deg)';
         }
-        
-        function spawnItem() {
-            if(!gameActive) return;
-            if(activeItems.filter(i => i.type !== 'finish').length >= 6) return; 
-            
-            let isCheese = false;
-            
-            if (consecutiveObstacles >= 2) {
-                isCheese = true; 
-            } else if (consecutiveCheese >= 1) {
-                isCheese = false; 
-            } else {
-                isCheese = Math.random() < 0.18; 
-            }
-            
-            let typeStr = isCheese ? 'cheese' : 'obstacle';
-            let itemText = isCheese ? '🧀' : obstacleEmojis[Math.floor(Math.random() * obstacleEmojis.length)];
-            
-            if(isCheese) {
-                consecutiveCheese++;
-                consecutiveObstacles = 0;
-            } else {
-                consecutiveObstacles++;
-                consecutiveCheese = 0;
-            }
-            
-            let laneIdx;
-            do {
-                laneIdx = Math.floor(Math.random() * 3);
-            } while (laneIdx === lastLane && Math.random() > 0.3); 
-            
-            lastLane = laneIdx;
-            
-            const el = document.createElement('div');
-            el.className = 'entity ' + typeStr;
-            el.innerText = itemText;
             el.style.left = lanes[laneIdx] + '%';
             setItemDepth(el, 2500);
             
@@ -590,17 +555,6 @@
 
         function update() {
             if(!gameActive) return;
-            
-            score += 1.25; 
-            scoreDisplay.innerText = "Mesafe: " + Math.floor(score);
-            adjustDifficulty();
-
-            if(score >= targetScore && !activeItems.find(i => i.type === "finish")) {
-                spawnFinishLine();
-            }
-
-            for(let i = activeItems.length - 1; i >= 0; i--) {
-                let item = activeItems[i];
                 item.z -= currentSpeed; 
                 setItemDepth(item.el, item.z);
 
@@ -666,44 +620,31 @@
                 console.error('Oyun başlatma hatası:', e);
                 document.getElementById('start-screen').classList.add('hidden');
             }
-        }
-
-        function gameOver() {
-            gameActive = false;
-            cancelAnimationFrame(animationFrameId);
-            clearInterval(itemLoop);
-            stopMusic();
-            playLoseSound();
-            document.getElementById('game-over').classList.remove('hidden');
-        }
-
-        function winGame() {
-            gameActive = false;
-            cancelAnimationFrame(animationFrameId);
-            clearInterval(itemLoop);
             stopMusic();
             playWinSound();
             document.getElementById('win-screen').classList.remove('hidden');
         }
 
         function createConfetti() {
-            const colors = ['#ff69b4', '#ff1493', '#ffd700', '#00ced1', '#87cefa'];
+            const colors = ['#ff3b3b', '#ff9500', '#ffd400', '#4cd964', '#00c2ff', '#5856d6', '#ff2d95', '#ffffff'];
             const vw = window.innerWidth;
             const vh = window.innerHeight;
             const originY = vh * 0.55;
-            const count = 90;
+            const count = 100;
 
             for(let i = 0; i < count; i++) {
                 const fromLeft = i % 2 === 0;
                 let conf = document.createElement('div');
                 conf.className = 'confetti';
 
-                const size = 8 + Math.random() * 8;
-                conf.style.width = size + 'px';
-                conf.style.height = size + 'px';
-                if (Math.random() > 0.5) conf.style.borderRadius = '50%';
+                // Klasik şerit konfeti görünümü: dikdörtgen, parlama efekti yok
+                const isStrip = Math.random() > 0.35;
+                const w = isStrip ? (4 + Math.random() * 4) : (7 + Math.random() * 4);
+                const h = isStrip ? (10 + Math.random() * 8) : w;
+                conf.style.width = w + 'px';
+                conf.style.height = h + 'px';
+                if (!isStrip && Math.random() > 0.5) conf.style.borderRadius = '50%';
                 conf.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-                conf.style.boxShadow = '0 0 6px rgba(255,255,255,0.6)';
 
                 conf.style.left = (fromLeft ? -10 : vw + 10) + 'px';
                 conf.style.top = originY + 'px';
