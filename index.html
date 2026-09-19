@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Eylül'ün Kaçış Serüveni</title>
+    <link rel="preload" as="image" href="25275.png">
+    <link rel="preload" as="image" href="25276.jpg">
     <style>
         body { 
             margin: 0; 
@@ -265,8 +267,8 @@
             <div class="lane-line line-left"></div>
             <div class="lane-line line-right"></div>
             
-            <div id="tom"><img src="25275.png" alt="Tom"></div>
-            <div id="jerry"><img src="25276.jpg" alt="Jerry"></div>
+            <div id="tom"><img src="25275.png" alt="Tom" fetchpriority="high" decoding="sync"></div>
+            <div id="jerry"><img src="25276.jpg" alt="Jerry" fetchpriority="high" decoding="sync"></div>
         </div>
     </div>
 
