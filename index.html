@@ -10,7 +10,7 @@
         body { 
             margin: 0; 
             overflow: hidden; 
-            background: linear-gradient(to bottom, #87CEEB 0%, #e0f7fa 100%); 
+            background: linear-gradient(to bottom, #fdf3e3 0%, #f3dfc0 60%, #e3c79c 100%); 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
         }
 
@@ -29,14 +29,16 @@
         #road {
             width: 800px; 
             height: 2500px;
-            background: #555;
+            background:
+                repeating-conic-gradient(#c0392b 0% 25%, #f6ecd9 0% 50%) 
+                0 0 / 130px 130px;
             position: absolute; 
             bottom: -100px;
             transform-origin: bottom center;
             transform: rotateX(75deg); 
             transform-style: preserve-3d;
-            border-left: 20px solid #fff; 
-            border-right: 20px solid #fff;
+            border-left: 22px solid #7a4a2b; 
+            border-right: 22px solid #7a4a2b;
             box-shadow: 0 0 30px rgba(0,0,0,0.3);
         }
 
