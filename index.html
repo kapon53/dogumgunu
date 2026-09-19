@@ -53,6 +53,7 @@
             100% { background-position: 0 200px; }
         }
 
+        /* Genel öğeler (tuzak/peynir/bitiş çizgisi) - hafif, sadece transform ile hareket eder */
         .entity {
             position: absolute;
             bottom: 0;
@@ -61,21 +62,32 @@
             display: flex;
             justify-content: center;
             align-items: flex-end;
-            will-change: transform;
         }
-        #jerry, #tom { transition: left 0.25s ease-in-out; }
-
-        .entity img {
-            max-height: 95px;
-        }
-        
-        #tom img { max-height: 110px; } 
-        #jerry img { max-height: 100px; }
-
-        #jerry { left: 50%; bottom: 300px; z-index: 100; }
-        #tom { left: 50%; bottom: 90px; z-index: 101; }
         .obstacle { font-size: 65px; }
         .cheese { font-size: 60px; }
+
+        /* Tom ve Jerry: sabit piksel kutu + object-fit ile TÜM cihazlarda aynı boyutta render edilir
+           (max-height + flex kombinasyonu bazı telefon tarayıcılarında (in-app webview vb.)
+           farklı/yanlış boyutlanabiliyordu, bu yüzden sabit kutu + object-fit:contain kullanıyoruz) */
+        #jerry, #tom {
+            position: absolute;
+            transform-origin: bottom center;
+            transform: translateX(-50%) rotateX(-75deg);
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            transition: left 0.15s ease-in-out;
+            will-change: transform;
+        }
+        #jerry { left: 50%; bottom: 300px; z-index: 100; width: 100px; height: 100px; }
+        #tom { left: 50%; bottom: 90px; z-index: 101; width: 120px; height: 120px; }
+        #jerry img, #tom img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: bottom center;
+            display: block;
+        }
 
         #hud { 
             position: absolute; 
@@ -253,8 +265,8 @@
             <div class="lane-line line-left"></div>
             <div class="lane-line line-right"></div>
             
-            <div id="tom" class="entity"><img src="25275.png" alt="Tom"></div>
-            <div id="jerry" class="entity"><img src="25276.jpg" alt="Jerry"></div>
+            <div id="tom"><img src="25275.png" alt="Tom"></div>
+            <div id="jerry"><img src="25276.jpg" alt="Jerry"></div>
         </div>
     </div>
 
@@ -304,6 +316,8 @@
     <script>
         let gameActive = false;
         let currentLane = 1; 
+        let prevLane = 1;
+        let laneChangeTime = 0;
         const lanes = [30, 50, 70]; 
         
         let score = 0;
@@ -320,6 +334,12 @@
         let animationFrameId; 
         let itemLoop;
         let isInvincible = false; 
+
+        // ---------- Performans: zayıf cihazlarda otomatik hafifletme ----------
+        let maxItems = 6;
+        let lowPerfMode = false;
+        let frameTimes = [];
+        let lastFrameTs = 0;
 
         // ---------- Ses Sistemi ----------
         let soundOn = true;
@@ -422,16 +442,27 @@
             livesDisplay.innerText = "Can: " + hearts;
         }
 
+        // Şerit değişimini tek yerden yönet - önceki şeridi ve değişim zamanını kaydeder
+        // (geçiş animasyonu bitmeden çarpışma algılamasında kısa bir tolerans sağlar)
+        function changeLane(newLane) {
+            if(!gameActive) return;
+            if(newLane < 0 || newLane > 2 || newLane === currentLane) return;
+            prevLane = currentLane;
+            currentLane = newLane;
+            laneChangeTime = performance.now();
+            updatePositions();
+        }
+
         function handleGameKey(e) {
             if(e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'a' || e.key === 'd' || e.key === 'A' || e.key === 'D') {
                 e.preventDefault();
             }
             if(!gameActive) return;
-            if((e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') && currentLane > 0) {
-                currentLane--; updatePositions();
+            if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                changeLane(currentLane - 1);
             }
-            if((e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') && currentLane < 2) {
-                currentLane++; updatePositions();
+            if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                changeLane(currentLane + 1);
             }
         }
         
@@ -447,19 +478,12 @@
             if(!gameActive) return;
             if(e.target.closest('#controls')) return;
             const touchX = e.touches[0].clientX;
-            if(touchX < window.innerWidth / 2 && currentLane > 0) currentLane--;
-            else if(touchX >= window.innerWidth / 2 && currentLane < 2) currentLane++;
-            updatePositions();
+            if(touchX < window.innerWidth / 2) changeLane(currentLane - 1);
+            else changeLane(currentLane + 1);
         });
 
-        function moveLeft() {
-            if(!gameActive) return;
-            if(currentLane > 0) { currentLane--; updatePositions(); }
-        }
-        function moveRight() {
-            if(!gameActive) return;
-            if(currentLane < 2) { currentLane++; updatePositions(); }
-        }
+        function moveLeft() { changeLane(currentLane - 1); }
+        function moveRight() { changeLane(currentLane + 1); }
         const btnLeft = document.getElementById('btn-left');
         const btnRight = document.getElementById('btn-right');
         ['click', 'touchstart'].forEach(evt => {
@@ -471,7 +495,7 @@
             jerry.style.left = lanes[currentLane] + '%';
             setTimeout(() => {
                 if(gameActive) tom.style.left = lanes[currentLane] + '%';
-            }, 300); 
+            }, 150); 
         }
 
         // ---------- Eşya Sistemi ----------
@@ -486,7 +510,7 @@
         
         function spawnItem() {
             if(!gameActive) return;
-            if(activeItems.filter(i => i.type !== 'finish').length >= 6) return; 
+            if(activeItems.filter(i => i.type !== 'finish').length >= maxItems) return; 
             
             let isCheese = false;
             
@@ -574,17 +598,33 @@
         
         function adjustDifficulty() {
             currentSpeed = 19 + Math.min(15, Math.floor(score / 350) * 1.8);
-            const newSpawnRate = Math.max(180, 400 - Math.floor(score / 350) * 25);
+            let baseSpawnRate = Math.max(180, 400 - Math.floor(score / 350) * 25);
+            if (lowPerfMode) baseSpawnRate += 90; // zayıf cihazda daha az sıklıkta eşya çıkar
             
-            if (newSpawnRate !== currentSpawnRate) {
-                currentSpawnRate = newSpawnRate;
+            if (baseSpawnRate !== currentSpawnRate) {
+                currentSpawnRate = baseSpawnRate;
                 clearInterval(itemLoop);
                 itemLoop = setInterval(spawnItem, currentSpawnRate);
             }
         }
 
-        function update() {
+        function update(ts) {
             if(!gameActive) return;
+
+            // Kare süresini ölç, sürekli düşük FPS varsa otomatik hafif moda geç
+            if (lastFrameTs) {
+                const dt = ts - lastFrameTs;
+                frameTimes.push(dt);
+                if (frameTimes.length > 40) frameTimes.shift();
+                if (!lowPerfMode && frameTimes.length >= 30) {
+                    const avg = frameTimes.reduce((a,b)=>a+b,0) / frameTimes.length;
+                    if (avg > 30) { // ortalama 30ms üzeri = ~33 FPS altı
+                        lowPerfMode = true;
+                        maxItems = 4;
+                    }
+                }
+            }
+            lastFrameTs = ts;
             
             score += 1.25; 
             scoreDisplay.innerText = "Mesafe: " + Math.floor(score);
@@ -593,6 +633,9 @@
             if(score >= targetScore && !activeItems.find(i => i.type === "finish")) {
                 spawnFinishLine();
             }
+
+            // Şerit değiştireli az önceyse (250ms içi), önceki şeride denk gelen çarpışmalar da sayılır
+            const inLaneGrace = (performance.now() - laneChangeTime) < 250;
 
             for(let i = activeItems.length - 1; i >= 0; i--) {
                 let item = activeItems[i];
@@ -603,7 +646,7 @@
                     if(item.type === "finish") {
                         winGame();
                         return;
-                    } else if(item.lane === currentLane) {
+                    } else if(item.lane === currentLane || (inLaneGrace && item.lane === prevLane)) {
                         item.hit = true;
                         if(item.type === "cheese") {
                             playCheeseSound();
@@ -633,6 +676,12 @@
         function startGame() {
             if (gameActive) return; 
             try {
+                // Safari/iOS: ses motorunu doğrudan bu tıklama anında aç (aksi halde sessiz kalabilir)
+                try {
+                    const ctx = getAudioCtx();
+                    if (ctx.state === 'suspended') ctx.resume();
+                } catch (e) {}
+
                 cancelAnimationFrame(animationFrameId);
                 clearInterval(itemLoop);
                 
@@ -645,6 +694,10 @@
                 gameActive = true;
                 currentSpeed = 19;
                 currentSpawnRate = 400;
+                maxItems = 6;
+                lowPerfMode = false;
+                frameTimes = [];
+                lastFrameTs = 0;
                 consecutiveObstacles = 0;
                 consecutiveCheese = 0;
                 lastLane = -1;
